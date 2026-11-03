@@ -2,12 +2,7 @@
 set -euo pipefail
 
 # ==============================================================================
-# 一键秒级原子回滚脚本 (Instant Zero-Downtime Rollback)
-# 用法:
-#   bash rollback-remote.sh [TARGET_RELEASE_ID]
-# 示例:
-#   bash rollback-remote.sh              # 自动回滚到上一个稳定版本
-#   bash rollback-remote.sh 20261103_cab5dec  # 回滚到指定版本
+# 多环境通用一键秒级原子回滚脚本 (Universal Instant Rollback Script)
 # ==============================================================================
 
 DEPLOY_DIR="${DEPLOY_REMOTE_DIR:?DEPLOY_REMOTE_DIR must be specified}"
@@ -30,7 +25,6 @@ if [ -L "$CURRENT_LINK" ]; then
     echo "📍 当前正在运行的版本: $CURRENT_TARGET"
 fi
 
-# 获取所有历史版本（按时间倒序排列）
 ALL_RELEASES=($(ls -1dt "$RELEASES_DIR"/* | xargs -n 1 basename))
 
 if [ ${#ALL_RELEASES[@]} -le 1 ]; then
@@ -40,7 +34,6 @@ fi
 
 TARGET_VERSION="${1:-}"
 
-# 如果用户没有指定版本，自动选取当前版本的下一个（即上一个发布版本）
 if [ -z "$TARGET_VERSION" ]; then
     for ((i=0; i<${#ALL_RELEASES[@]}; i++)); do
         if [ "${ALL_RELEASES[$i]}" == "$CURRENT_TARGET" ]; then
@@ -58,7 +51,6 @@ fi
 
 TARGET_PATH="$RELEASES_DIR/$TARGET_VERSION"
 if [ ! -d "$TARGET_PATH" ]; then
-    # 支持模糊前缀匹配（如只输入 commit sha 的前 7 位）
     MATCHED=$(ls -1d "$RELEASES_DIR"/*"$TARGET_VERSION"* 2>/dev/null | head -n 1 || true)
     if [ -n "$MATCHED" ] && [ -d "$MATCHED" ]; then
         TARGET_PATH="$MATCHED"
@@ -73,19 +65,28 @@ fi
 
 echo "🎯 正在将线上流量原子切换至目标版本: [$TARGET_VERSION] ..."
 
-# 原子切换软链接（避免中间状态被请求打到空目录）
 ln -sfn "$TARGET_PATH" "${DEPLOY_DIR}/current_tmp"
 mv -Tf "${DEPLOY_DIR}/current_tmp" "$CURRENT_LINK"
 
-# 修正权限并热重载服务
-if id "www" &>/dev/null; then
-    chown -h www:www "$CURRENT_LINK" 2>/dev/null || true
+WEB_USER=""
+if id "www" &>/dev/null; then WEB_USER="www";
+elif id "www-data" &>/dev/null; then WEB_USER="www-data";
+elif id "nginx" &>/dev/null; then WEB_USER="nginx";
+elif id "apache" &>/dev/null; then WEB_USER="apache"; fi
+
+if [ -n "$WEB_USER" ]; then
+    chown -h "$WEB_USER:$WEB_USER" "$CURRENT_LINK" 2>/dev/null || true
 fi
 
-if systemctl is-active --quiet php-fpm 2>/dev/null; then
-    systemctl reload php-fpm 2>/dev/null || true
-elif systemctl is-active --quiet php82-php-fpm 2>/dev/null; then
-    systemctl reload php82-php-fpm 2>/dev/null || true
+for s in "php-fpm" "php8.2-fpm" "php82-php-fpm" "php8.3-fpm" "php8.1-fpm" "php7.4-fpm" "php74-php-fpm"; do
+    if systemctl is-active --quiet "$s" 2>/dev/null; then
+        systemctl reload "$s" 2>/dev/null || true
+        break
+    fi
+done
+
+if systemctl is-active --quiet nginx 2>/dev/null; then
+    systemctl reload nginx 2>/dev/null || nginx -s reload 2>/dev/null || true
 fi
 
 echo "=========================================================="

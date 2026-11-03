@@ -52,11 +52,13 @@ ssh root@<服务器IP> "bash /www/wwwroot/<项目名>/scripts/rollback-remote.sh
 ## 📂 技能资产索引
 
 - 自动化建站脚本：[`resources/auto-setup-vhost.sh`](./resources/auto-setup-vhost.sh)
+- 新服务器初始化底座：[`resources/init-new-server.sh`](./resources/init-new-server.sh)
 - Actions 流水线模板：[`resources/deploy-workflow.yml`](./resources/deploy-workflow.yml)
 - 远程部署脚本：[`resources/deploy-remote.sh`](./resources/deploy-remote.sh)
 - 远程回滚脚本：[`resources/rollback-remote.sh`](./resources/rollback-remote.sh)
 - Nginx 安全规则：[`resources/nginx-security.conf`](./resources/nginx-security.conf)
 - MySQL 定时灾备：[`resources/backup-mysql.sh`](./resources/backup-mysql.sh)
+- 更换服务器迁移指南：[`references/server-migration-guide.md`](./references/server-migration-guide.md)
 - 新域名部署指南：[`references/domain-quickstart.md`](./references/domain-quickstart.md)
 - 版本回滚实战指南：[`references/rollback-guide.md`](./references/rollback-guide.md)
 - 踩坑避坑汇总：[`references/pitfalls-and-solutions.md`](./references/pitfalls-and-solutions.md)
