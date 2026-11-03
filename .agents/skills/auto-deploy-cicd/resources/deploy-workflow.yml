@@ -4,6 +4,20 @@ on:
   push:
     branches: [main, master]
   workflow_dispatch:
+    inputs:
+      action:
+        description: '执行操作 (deploy: 发布部署 / rollback: 版本回滚)'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - rollback
+      rollback_version:
+        description: '回滚目标版本（留空则自动回滚至上一个稳定版本）'
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: ${{ github.repository }}-production
@@ -11,12 +25,12 @@ concurrency:
 
 jobs:
   validate:
+    if: "${{ github.event_name == 'push' || github.event.inputs.action == 'deploy' }}"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 若为 PHP 项目启用此步骤，若为 Node/Go 项目可切换为对应语言工具链
       - name: Setup PHP (Optional)
         uses: shivammathur/setup-php@v2
         with:
@@ -25,12 +39,13 @@ jobs:
 
       - name: Lint Syntax
         run: |
-          echo "🔍 正在检查代码语法..."
+          echo "🔍 正在进行代码语法规范检查..."
           find . -type f -name '*.php' -not -path './uploads/*' -not -path './vendor/*' -exec php -l {} \; | grep -v 'No syntax errors' || true
-          echo "✅ 代码语法校验通过"
+          echo "✅ 语法检查通过！"
 
   deploy:
     needs: validate
+    if: "${{ github.event_name == 'push' || github.event.inputs.action == 'deploy' }}"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -58,7 +73,6 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
         run: |
           install -m 700 -d ~/.ssh
-          # 关键处理：清洗 Windows CRLF 换行符并补充末尾换行，防止 libcrypto 解析失败
           printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           echo "" >> ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
@@ -75,8 +89,37 @@ jobs:
           echo "🚀 [1/2] 上传制品至远程服务器..."
           scp -o ServerAliveInterval=15 -P "$DEPLOY_PORT" /tmp/project-release.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/release-$RELEASE_ID.tar.gz"
 
-          echo "🚀 [2/2] 执行远程解压激活与权限配置..."
+          echo "🚀 [2/2] 执行原子解压激活与软链接切换..."
           ssh -o ServerAliveInterval=15 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
             "DEPLOY_REMOTE_DIR='$DEPLOY_REMOTE_DIR' RELEASE_ID='$RELEASE_ID' bash -s" < scripts/deploy-remote.sh
 
           echo "🎉 部署完成并成功上线！"
+
+  rollback:
+    if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'rollback' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          echo "" >> ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Execute Instant Atomic Rollback
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}
+          DEPLOY_REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR }}
+          TARGET_VERSION: ${{ github.event.inputs.rollback_version }}
+        run: |
+          echo "⏪ 正在连接服务器执行一键回滚..."
+          ssh -o ServerAliveInterval=15 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_REMOTE_DIR='$DEPLOY_REMOTE_DIR' bash -s -- '$TARGET_VERSION'" < scripts/rollback-remote.sh
+          echo "🎉 回滚指令执行完毕！"
