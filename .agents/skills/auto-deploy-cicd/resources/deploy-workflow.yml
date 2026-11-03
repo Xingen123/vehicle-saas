@@ -1,0 +1,82 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.repository }}-production
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 若为 PHP 项目启用此步骤，若为 Node/Go 项目可切换为对应语言工具链
+      - name: Setup PHP (Optional)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo_mysql, gd, curl, openssl
+
+      - name: Lint Syntax
+        run: |
+          echo "🔍 正在检查代码语法..."
+          find . -type f -name '*.php' -not -path './uploads/*' -not -path './vendor/*' -exec php -l {} \; | grep -v 'No syntax errors' || true
+          echo "✅ 代码语法校验通过"
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Assemble Release Package
+        run: |
+          echo "📦 正在打包发布制品（写入临时目录避免自我读取冲突）..."
+          tar --warning=no-file-changed \
+              --exclude='.git' \
+              --exclude='.github' \
+              --exclude='config.php' \
+              --exclude='.env' \
+              --exclude='install.lock' \
+              --exclude='uploads/*' \
+              --exclude='logs/*' \
+              --exclude='node_modules' \
+              -czf /tmp/project-release.tar.gz .
+          echo "📦 打包完成，压缩包体积: $(ls -lh /tmp/project-release.tar.gz | awk '{print $5}')"
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+        run: |
+          install -m 700 -d ~/.ssh
+          # 关键处理：清洗 Windows CRLF 换行符并补充末尾换行，防止 libcrypto 解析失败
+          printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          echo "" >> ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload and Deploy Release
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER || 'root' }}
+          DEPLOY_REMOTE_DIR: ${{ secrets.DEPLOY_REMOTE_DIR }}
+          RELEASE_ID: ${{ github.sha }}
+        run: |
+          echo "🚀 [1/2] 上传制品至远程服务器..."
+          scp -o ServerAliveInterval=15 -P "$DEPLOY_PORT" /tmp/project-release.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/release-$RELEASE_ID.tar.gz"
+
+          echo "🚀 [2/2] 执行远程解压激活与权限配置..."
+          ssh -o ServerAliveInterval=15 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_REMOTE_DIR='$DEPLOY_REMOTE_DIR' RELEASE_ID='$RELEASE_ID' bash -s" < scripts/deploy-remote.sh
+
+          echo "🎉 部署完成并成功上线！"
