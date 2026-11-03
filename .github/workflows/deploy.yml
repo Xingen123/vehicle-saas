@@ -39,15 +39,16 @@ jobs:
         run: |
           echo "📦 正在打包发布制品..."
           # 排除 Git元数据、工作流配置、敏感文件、动态照片及运行日志
-          tar --exclude='.git' \
+          tar --warning=no-file-changed \
+              --exclude='.git' \
               --exclude='.github' \
               --exclude='config.php' \
               --exclude='install.lock' \
               --exclude='uploads/*' \
               --exclude='logs/*' \
               --exclude='assets/images/Tahoe-wallpaper.png' \
-              -czf vehicle-saas-release.tar.gz .
-          echo "📦 打包完成，压缩包体积: $(ls -lh vehicle-saas-release.tar.gz | awk '{print $5}')"
+              -czf /tmp/vehicle-saas-release.tar.gz .
+          echo "📦 打包完成，压缩包体积: $(ls -lh /tmp/vehicle-saas-release.tar.gz | awk '{print $5}')"
 
       - name: Configure SSH
         env:
@@ -69,7 +70,7 @@ jobs:
           RELEASE_ID: ${{ github.sha }}
         run: |
           echo "🚀 [1/2] 上传制品至远程服务器..."
-          scp -o ServerAliveInterval=15 -P "$DEPLOY_PORT" vehicle-saas-release.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/vehicle-saas-release-$RELEASE_ID.tar.gz"
+          scp -o ServerAliveInterval=15 -P "$DEPLOY_PORT" /tmp/vehicle-saas-release.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/vehicle-saas-release-$RELEASE_ID.tar.gz"
 
           echo "🚀 [2/2] 执行远程解压激活与权限配置..."
           ssh -o ServerAliveInterval=15 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
