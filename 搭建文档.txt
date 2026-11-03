@@ -1,0 +1,72 @@
+爱微圈 · 车辆管理系统（SaaS 多租户版）
+安装说明                              aiweiquan.cn
+================================================================
+
+一、环境要求
+  Web 服务器   Nginx / Apache（程序兼容 PHP 7.4+，推荐 8.0 及以上）
+  数据库       MySQL 5.7 / 8.0 及以上
+  必需扩展     pdo_mysql、json、mbstring、fileinfo
+  可选扩展     curl（AI 凭证识别）、openssl（邮件 SSL）
+
+二、安装步骤（约 3 分钟）
+  1. 上传
+     把本目录的全部文件上传到网站根目录。
+
+  2. 设置权限
+     chmod -R 755 .              # 根目录（安装时要写入 config.php）
+     chmod -R 755 uploads logs   # 照片与日志目录
+
+  3. 建站
+     Nginx 配置可参考本目录的 nginx.conf.example，
+     网站根目录指向本目录。
+
+  4. 运行安装向导
+     浏览器访问：http://你的域名/install.php
+
+       第 1 步  环境检测     自动完成，标「必需」的项目需全部通过
+       第 2 步  数据库配置   填地址/端口/库名/账号密码；库不存在会自动创建
+       第 3 步  站点与账号   站点地址、平台名称、两套管理员账号（可顺带配 SMTP）
+
+     完成后自动生成 config.php，并写入 install.lock 锁定向导。
+
+  5. 收尾（重要）
+     · 删除 install.php，防止被他人重复执行；
+     · 登录后台，在「用户管理」中修改初始密码。
+
+三、两套账号（在安装向导第 3 步自行设置）
+  平台超管     开通与管理企业（租户）；登录后只进入「租户管理」页
+  企业管理员   日常业务后台：车辆 / 加油 / 充电 / 保养 / 年检 / 保险 /
+               维修 / 统计报表 / 用户 / 系统日志
+
+四、定时任务（到期提醒邮件，可选）
+  crontab -e 添加一行：
+
+  0 8 * * * /usr/bin/php /你的网站路径/cron/remind.php >> /你的网站路径/logs/remind.log 2>&1
+
+  邮件需先配置 SMTP：可在安装向导第 3 步填写，或稍后编辑 config.php。
+  注意 QQ / 163 邮箱要填「授权码」，不是登录密码。
+
+五、目录说明
+  config.php        安装时自动生成：数据库 / 站点 / 邮件配置
+  install.php       安装向导（安装完成后请删除）
+  install.sql       数据库结构 + 初始数据（由安装向导自动导入）
+  upgrade_ev.sql    老库升级：增加新能源充电功能
+  upgrade_saas.sql  老库升级：升级为多租户结构（幂等，可重复执行）
+  login.php         登录页          index.php        控制台
+  tenants.php       平台超管后台：企业管理
+  vehicles.php      车辆管理        repair.php       维修管理
+  fuel.php          加油记录        charge.php       充电记录
+  maintenance.php   保养记录        inspection.php   年检记录
+  insurance.php     保险记录        reports.php      统计报表
+  users.php         用户管理        settings.php     系统设置
+  oplog.php         系统日志
+  includes/         核心类库（建议在 Nginx 中禁止外部访问）
+  h5/               司机扫码端：h5/upload.php 加油上报、h5/charge.php 充电上报
+  cron/remind.php   每日提醒脚本（仅允许命令行执行）
+  uploads/          司机上传的照片（需可写）
+  logs/             运行日志（需可写）
+  assets/           CSS / JS（Chart.js、二维码库，已本地化）
+
+六、遇到问题
+  常见问题与排查方法详见同目录的 部署说明.md
+================================================================

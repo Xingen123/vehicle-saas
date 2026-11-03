@@ -1,0 +1,21 @@
+# 生产环境配置（严禁提交敏感账号密码）
+config.php
+install.lock
+
+# 用户上传照片与运行日志（生产动态生成）
+uploads/*
+!uploads/.gitkeep
+logs/*
+!logs/.gitkeep
+
+# 冗余无引用静态大文件（27MB）
+assets/images/Tahoe-wallpaper.png
+
+# 操作系统与编辑器临时文件
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+*.swp
+*.bak

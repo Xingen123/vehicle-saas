@@ -1,0 +1,48 @@
+# =========================================================
+# 车辆管理系统 Nginx 站点配置示例
+# 环境：Alibaba Cloud Linux 3 + Nginx + PHP 8.2 (PHP-FPM)
+# 将本文件内容合并到 /etc/nginx/conf.d/vehicle.conf（或宝塔面板站点配置）
+# =========================================================
+
+server {
+    listen       80;
+    server_name  您的域名或IP;          # 例如 vehicle.example.com
+    root         /www/wwwroot/vehicle-system;   # 解压后的程序目录
+    index        index.php index.html;
+
+    # 上传照片大小限制（与 config.php 中 UPLOAD_MAX_SIZE 对应）
+    client_max_body_size 12m;
+
+    access_log /www/wwwlogs/vehicle_access.log;
+    error_log  /www/wwwlogs/vehicle_error.log;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # PHP 解析（PHP-FPM；sock 路径以实际为准，宝塔一般为 /tmp/php-cgi-82.sock）
+    location ~ \.php$ {
+        fastcgi_pass   unix:/tmp/php-cgi-82.sock;
+        # 若使用默认 PHP-FPM 端口方式：fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index  index.php;
+        fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include        fastcgi_params;
+    }
+
+    # 安全：禁止直接访问配置、SQL、日志等敏感文件
+    location ~* /(config\.php|install\.sql|\.git) { deny all; }
+    location ~* ^/(includes|cron|logs)/           { deny all; }
+
+    # 安全：uploads 目录仅作为静态图片，禁止执行 PHP
+    location ~* ^/uploads/.*\.(php|phtml|phar)$ { deny all; }
+    location /uploads/ {
+        expires 7d;
+    }
+
+    # 静态资源缓存
+    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg)$ {
+        expires 30d;
+    }
+}
+
+# 建议上线后配置 HTTPS（可申请免费证书），司机扫码页涉及拍照上传，HTTPS 下浏览器兼容性更好。

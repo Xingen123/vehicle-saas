@@ -1,0 +1,32 @@
+<?php
+/**
+ * 车辆管理系统配置文件模板
+ * 部署时请重命名为 config.php 并修改对应参数
+ */
+
+// ---------- 数据库配置 ----------
+define('DB_HOST', '127.0.0.1');
+define('DB_PORT', 3306);
+define('DB_NAME', 'vehicle_mgr');
+define('DB_USER', 'vehicle_user');
+define('DB_PASS', '你的数据库密码');
+define('DB_CHARSET', 'utf8mb4');
+
+// ---------- 站点配置 ----------
+// 平台名称（登录页、超管后台显示；各企业内显示各自设置的站点名）
+define('PLATFORM_NAME', '车辆管理系统');
+
+// 站点的完整访问地址（不带结尾斜杠），用于生成司机扫码链接与邮件中的链接
+define('BASE_URL', 'http://你的域名或IP');
+
+// 上传文件目录（默认无需修改）
+define('UPLOAD_DIR', __DIR__ . '/uploads');
+define('UPLOAD_MAX_SIZE', 10 * 1024 * 1024); // 10MB
+
+// ---------- 邮件提醒（SMTP，以 QQ 邮箱为例）----------
+define('SMTP_HOST', 'smtp.qq.com');
+define('SMTP_PORT', 465);
+define('SMTP_SECURE', 'ssl');
+define('SMTP_USER', 'xxx@qq.com');
+define('SMTP_PASS', '你的SMTP授权码');
+define('SMTP_FROM', 'xxx@qq.com');
