@@ -253,8 +253,16 @@ function save_upload(array $file): ?string
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) return null;
     if ($file['size'] > UPLOAD_MAX_SIZE) return null;
 
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $mime  = $finfo->file($file['tmp_name']);
+    $mime = '';
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime  = (string)$finfo->file($file['tmp_name']);
+    } elseif (function_exists('mime_content_type')) {
+        $mime = (string)@mime_content_type($file['tmp_name']);
+    } else {
+        $img = @getimagesize($file['tmp_name']);
+        $mime = (string)($img['mime'] ?? '');
+    }
     $extMap = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
     if (!isset($extMap[$mime])) return null;
 
