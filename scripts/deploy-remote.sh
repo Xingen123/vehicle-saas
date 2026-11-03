@@ -38,16 +38,16 @@ elif [ ! -f "$DEPLOY_DIR/config.php" ] && [ -f "$DEPLOY_DIR/config.php.example" 
     echo "⚠️ 未找到生产 config.php，已由 example 复制创建，请记得填入真实数据库密码"
 fi
 
-# 5. 修正目录归属与读写权限（兼容宝塔 www 或原生 nginx/apache）
+# 5. 修正目录归属与读写权限（兼容宝塔 www 或原生 nginx/apache，忽略 .user.ini 免疫锁）
 echo "🔧 配置目录与读写权限..."
 if id "www" &>/dev/null; then
-    chown -R www:www "$DEPLOY_DIR"
+    chown -R www:www "$DEPLOY_DIR" 2>/dev/null || true
 elif id "nginx" &>/dev/null; then
-    chown -R nginx:nginx "$DEPLOY_DIR"
+    chown -R nginx:nginx "$DEPLOY_DIR" 2>/dev/null || true
 fi
 
-chmod -R 755 "$DEPLOY_DIR"
-chmod -R 777 "$DEPLOY_DIR/uploads" "$DEPLOY_DIR/logs"
+chmod -R 755 "$DEPLOY_DIR" 2>/dev/null || true
+chmod -R 777 "$DEPLOY_DIR/uploads" "$DEPLOY_DIR/logs" 2>/dev/null || true
 
 # 6. 清理临时压缩包
 rm -f "$RELEASE_ARCHIVE"
